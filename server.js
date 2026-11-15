@@ -25,7 +25,17 @@ const tooMany = (k, max, ms = 60000) => {
 };
 
 // ---------- Halaman
-app.get('/', (_, r) => r.sendFile(path.join(__dirname, 'token.html')));
+const CORS = E.CORS_ORIGIN; // isi jika xozen.html dibuka dari domain lain, mis. https://bandelbanget.xyz
+app.use((req, res, next) => {
+  if (CORS) {
+    res.set({ 'Access-Control-Allow-Origin': CORS, 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', Vary: 'Origin' });
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
+const home = fs.existsSync(path.join(__dirname, 'xozen.html')) ? 'xozen.html' : 'token.html';
+app.get('/', (_, r) => r.sendFile(path.join(__dirname, home)));
+app.get('/token', (_, r) => r.sendFile(path.join(__dirname, 'token.html')));
 app.get('/admin', (_, r) => r.sendFile(path.join(__dirname, 'admin.html')));
 
 // ---------- Cek sisa token (publik, key milik pengguna sendiri, tidak disimpan)
