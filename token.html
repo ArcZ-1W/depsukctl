@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cek sisa token</title>
+<style>
+:root{--bg:#f4f5f7;--pn:#fff;--ink:#14181f;--mu:#5f6b7a;--ln:#dde2ea;--ac:#1f5eff;--onac:#fff;--ok:#12a150;--er:#d92d20;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--pn:#171c24;--ink:#e9edf3;--mu:#92a0b3;--ln:#262e3a;--ac:#5b8cff;--onac:#06122e;--ok:#3ddc84;--er:#ff6b5e;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:480px;margin:0 auto;padding:12vh 16px 40px}
+h1{font-size:1.5rem;letter-spacing:-.02em;margin:0 0 4px}
+.mu{color:var(--mu);font-size:.9rem}
+.box{background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:18px;margin-top:18px}
+input{width:100%;padding:12px;border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+button{width:100%;margin-top:12px;padding:12px;border:0;border-radius:10px;background:var(--ac);color:var(--onac);font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+.big{font-size:2.6rem;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+.li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--ln)}.li span:first-child{color:var(--mu)}
+.ok{color:var(--ok)}.er{color:var(--er)}
+details{margin-top:14px}summary{cursor:pointer;color:var(--mu);font-size:.9rem}
+pre{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:10px;overflow:auto;max-height:260px;white-space:pre-wrap;word-break:break-word}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Cek sisa token</h1>
+  <div class="mu">Tempel API key kamu. Key hanya dipakai untuk satu pengecekan dan tidak disimpan.</div>
+  <form class="box" id="f" autocomplete="off">
+    <input id="k" type="password" placeholder="sk-..." aria-label="API key" autocapitalize="off" spellcheck="false" required>
+    <button id="b">Cek sisa token</button>
+  </form>
+  <div class="box" id="out" hidden></div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>n==null?'-':Number(n).toLocaleString('id-ID');
+function rows(d){
+  const R=[],u=d.usage&&d.usage.status===200&&d.usage.data&&d.usage.data.data;
+  if(u){
+    if(u.unlimited_quota)R.push(['Sisa','Tak terbatas']);
+    else{R.push(['Sisa',fmt(u.total_available)]);R.push(['Terpakai',fmt(u.total_used)]);R.push(['Total jatah',fmt(u.total_granted)])}
+    if(u.expires_at!=null)R.push(['Kedaluwarsa',u.expires_at>0?new Date(u.expires_at*1000).toLocaleDateString('id-ID'):'Tidak ada']);
+    if(u.name)R.push(['Nama key',u.name]);
+  }else if(d.sub&&d.sub.status===200&&d.bill&&d.bill.status===200){
+    const lim=Number(d.sub.data.hard_limit_usd),used=Number(d.bill.data.total_usage)/100;
+    R.push(['Sisa','$'+(lim-used).toFixed(2)],['Terpakai','$'+used.toFixed(2)],['Batas','$'+lim.toFixed(2)]);
+  }
+  return R;
+}
+function show(d){
+  const o=$('#out'),m=d.models?d.models.status:0,R=rows(d);
+  o.replaceChildren();o.hidden=false;
+  const st=document.createElement('div');
+  st.className=m===200?'ok':(m===401||m===403)?'er':'mu';
+  st.textContent=m===200?'API key valid':(m===401||m===403)?'API key tidak valid atau ditolak':'Status key tidak bisa dipastikan';
+  o.append(st);
+  if(R.length){
+    const big=document.createElement('div');big.className='big';big.textContent=R[0][1];big.style.margin='8px 0';o.append(big);
+    R.forEach(([a,b])=>{const l=document.createElement('div');l.className='li';const x=document.createElement('span'),y=document.createElement('span');x.textContent=a;y.textContent=b;l.append(x,y);o.append(l)});
+  }else if(m===200){const p=document.createElement('p');p.className='mu';p.textContent='Key valid, tetapi server tidak menyediakan data sisa token lewat endpoint yang dikenal.';o.append(p)}
+  const dt=document.createElement('details'),sm=document.createElement('summary'),pr=document.createElement('pre');
+  sm.textContent='Respons mentah';pr.textContent=JSON.stringify(d,null,2);dt.append(sm,pr);o.append(dt);
+}
+$('#f').onsubmit=async e=>{
+  e.preventDefault();$('#b').disabled=true;
+  try{
+    const r=await fetch('/token/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:$('#k').value.trim()})});
+    const d=await r.json();
+    if(d.error){$('#out').hidden=false;$('#out').innerHTML='<span class="er"></span>';$('#out').firstChild.textContent=d.error}else show(d);
+  }catch{$('#out').hidden=false;$('#out').textContent='Gagal menghubungi server.'}
+  $('#b').disabled=false;
+};
+</script>
+</body>
+</html>
